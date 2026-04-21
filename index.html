@@ -187,14 +187,24 @@
     .camera-wrapper {
       position: relative;
       background: #000;
-      min-height: 400px;
+      min-height: 480px;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 10px;
+    }
+
+    #video-container {
+      position: relative;
+      line-height: 0;
+      display: inline-block;
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     #video {
-      width: 100%;
+      max-width: 100%;
       height: auto;
       display: block;
       transform: scaleX(-1);
@@ -499,11 +509,13 @@
           <div class="icon">📷</div>
           <p>Kamerani yoqish uchun<br>quyidagi tugmani bosing</p>
         </div>
-        <video id="video" autoplay muted playsinline style="display:none"></video>
-        <canvas id="overlay"></canvas>
-        <div class="scan-corners"></div>
-        <div class="scan-corners sc2"></div>
-        <div class="scan-line" id="scan-line" style="display:none"></div>
+        <div id="video-container" style="display:none">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+          <div class="scan-corners"></div>
+          <div class="scan-corners sc2"></div>
+        </div>
+        <div class="scan-line" id="scan-line" style="display:none; width: 100%"></div>
       </div>
       <div class="camera-controls">
         <button class="btn primary" id="btn-start" onclick="startCamera()">▶ Kamerani yoqish</button>
@@ -613,10 +625,10 @@ const EMOTIONS_UZ = {
 // Loading models
 async function loadModels() {
   const steps = [
-    { text: 'SSD MobileNet modeli...', pct: 20, load: () => faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL) },
-    { text: 'Yuz orientiri modeli...', pct: 45, load: () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL) },
-    { text: 'His-tuyg\'u modeli...', pct: 65, load: () => faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) },
-    { text: 'Yosh/jins modeli...', pct: 85, load: () => faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL) },
+    { text: 'Face Detector modeli...', pct: 25, load: () => faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL) },
+    { text: 'Yuz orientiri modeli...', pct: 50, load: () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL) },
+    { text: 'His-tuyg\'u modeli...', pct: 75, load: () => faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) },
+    { text: 'Yosh/jins modeli...', pct: 90, load: () => faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL) },
   ];
 
   const bar = document.getElementById('loader-bar');
@@ -661,11 +673,13 @@ function setStatus(active, text) {
 }
 
 async function startCamera() {
+  console.log("Kamera so'ralmoqda...");
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } });
     const video = document.getElementById('video');
     video.srcObject = stream;
-    video.style.display = 'block';
+    
+    document.getElementById('video-container').style.display = 'inline-block';
     document.getElementById('placeholder').style.display = 'none';
     document.getElementById('scan-line').style.display = 'block';
     document.getElementById('btn-start').disabled = true;
@@ -673,6 +687,7 @@ async function startCamera() {
     document.getElementById('btn-snapshot').disabled = false;
 
     video.onloadedmetadata = () => {
+      console.log("Kamera stream boshlandi:", video.videoWidth, "x", video.videoHeight);
       const canvas = document.getElementById('overlay');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -681,7 +696,8 @@ async function startCamera() {
       detectLoop();
     };
   } catch(e) {
-    alert('Kameraga ruxsat berilmadi. HTTPS yoki localhost kerak.');
+    console.error("Kamerada xatolik:", e);
+    alert('Kameraga ruxsat berilmadi yoki xatolik yuz berdi. Iltimos, HTTPS orqali yoki local serverda ishga tushiring.');
   }
 }
 
@@ -689,7 +705,7 @@ function stopCamera() {
   detecting = false;
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null;
-  document.getElementById('video').style.display = 'none';
+  document.getElementById('video-container').style.display = 'none';
   document.getElementById('placeholder').style.display = 'flex';
   document.getElementById('scan-line').style.display = 'none';
   document.getElementById('btn-start').disabled = false;
@@ -719,7 +735,7 @@ async function detectLoop() {
   const ctx = canvas.getContext('2d');
 
   const detections = await faceapi
-    .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+    .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.1 }))
     .withFaceLandmarks()
     .withFaceExpressions()
     .withAgeAndGender();
