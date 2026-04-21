@@ -3,25 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FaceVision — Yuz va His-tuyg'u Tahlili</title>
+  <title>FaceVision Pro — AI Analytics Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
     :root {
-      --bg: #05070f;
-      --surface: #0d1120;
-      --surface2: #131828;
-      --border: rgba(100,180,255,0.12);
+      --bg: #03050a;
+      --surface: rgba(13, 17, 32, 0.7);
+      --surface-bright: rgba(25, 32, 58, 0.8);
+      --border: rgba(100, 180, 255, 0.15);
+      --border-bright: rgba(100, 180, 255, 0.3);
       --accent: #4f9eff;
+      --accent-glow: rgba(79, 158, 255, 0.4);
       --accent2: #a259ff;
+      --accent2-glow: rgba(162, 89, 255, 0.4);
       --green: #2affa0;
       --warn: #ffb347;
       --danger: #ff5c5c;
-      --text: #e8eaf0;
-      --text-muted: #7a8499;
+      --text: #ffffff;
+      --text-muted: #8b97b0;
       --mono: 'Space Mono', monospace;
-      --sans: 'DM Sans', sans-serif;
+      --sans: 'Inter', sans-serif;
+      --glass: backdrop-filter: blur(12px) saturate(180%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,442 +39,132 @@
       overflow-x: hidden;
     }
 
-    /* Grid background */
     body::before {
       content: '';
       position: fixed;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(79,158,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(79,158,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(79, 158, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(162, 89, 255, 0.05) 0%, transparent 40%),
+        linear-gradient(rgba(100, 180, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 180, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+      z-index: -1;
     }
-
-    /* Glow orbs */
-    .orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(100px);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .orb1 { width: 400px; height: 400px; top: -100px; left: -100px; background: rgba(79,158,255,0.07); }
-    .orb2 { width: 300px; height: 300px; bottom: 0; right: -50px; background: rgba(162,89,255,0.07); }
 
     header {
-      position: relative;
-      z-index: 1;
-      padding: 20px 32px;
+      position: sticky; top: 0; z-index: 10;
+      padding: 16px 32px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      background: rgba(3, 5, 10, 0.8);
       backdrop-filter: blur(10px);
-      background: rgba(5,7,15,0.6);
+      display: flex; align-items: center; justify-content: space-between;
     }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .logo-icon {
-      width: 32px; height: 32px;
-      border: 2px solid var(--accent);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-    }
-    .logo-text {
-      font-family: var(--mono);
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: -0.5px;
-    }
-    .logo-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--surface2);
+    .glass-card {
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-family: var(--mono);
-      color: var(--text-muted);
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     }
-    .status-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--text-muted);
-      transition: all 0.3s;
-    }
-    .status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-    main {
-      position: relative;
-      z-index: 1;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 24px;
-    }
-
-    .hero {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    .hero h1 {
-      font-size: clamp(28px, 5vw, 48px);
-      font-weight: 700;
-      line-height: 1.1;
-      background: linear-gradient(135deg, #fff 30%, var(--accent) 70%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 12px;
-    }
-    .hero p {
-      color: var(--text-muted);
-      font-size: 15px;
-      max-width: 500px;
-      margin: 0 auto;
-      line-height: 1.6;
-    }
+    .glass-card:hover { border-color: var(--border-bright); transform: translateY(-2px); }
 
     .app-grid {
       display: grid;
-      grid-template-columns: 1fr 320px;
-      gap: 20px;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+      align-items: start;
     }
 
-    @media (max-width: 800px) {
-      .app-grid { grid-template-columns: 1fr; }
+    .main-stage { display: flex; flex-direction: column; gap: 24px; }
+
+    .chart-container {
+      height: 200px;
+      margin-top: 16px;
+      position: relative;
     }
 
-    /* Camera panel */
-    .camera-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
+    .gallery-container {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 16px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
     }
-    .panel-title {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text-muted);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-    .panel-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .dot-red { background: #ff5f57; }
-    .dot-yellow { background: #febc2e; }
-    .dot-green { background: #28c840; }
-
-    .camera-wrapper {
+    .gallery-item {
+      width: 140px; height: 105px;
+      flex-shrink: 0;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
       position: relative;
       background: #000;
-      min-height: 480px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px;
-    }
-
-    #video-container {
-      position: relative;
-      line-height: 0;
-      display: inline-block;
-      box-shadow: 0 0 30px rgba(0,0,0,0.5);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    #video {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      transform: scaleX(-1);
-    }
-
-    #overlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      transform: scaleX(-1);
-    }
-
-    .camera-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      color: var(--text-muted);
-      padding: 60px 20px;
-    }
-    .camera-placeholder .icon { font-size: 48px; opacity: 0.4; }
-    .camera-placeholder p { font-size: 14px; text-align: center; }
-
-    .camera-controls {
-      padding: 16px 20px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      flex: 1;
-      min-width: 120px;
-      padding: 12px 20px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface2);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 14px;
-      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
     }
-    .btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
-    .btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #000;
-      font-weight: 700;
-    }
-    .btn.primary:hover { background: #3d8fff; transform: translateY(-1px); }
-    .btn.danger { border-color: var(--danger); color: var(--danger); }
-    .btn.danger:hover { background: rgba(255,92,92,0.1); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
-    /* Sidebar */
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+    .gallery-item:hover img { transform: scale(1.1); }
+    .gallery-time {
+      position: absolute; bottom: 4px; right: 4px;
+      font-size: 9px; font-family: var(--mono);
+      background: rgba(0,0,0,0.6); padding: 2px 4px; border-radius: 4px;
     }
 
-    .card {
-      background: var(--surface);
+    .control-row {
+      display: flex; gap: 12px; align-items: center;
+      margin-top: 12px;
+    }
+
+    .toggle-wrap {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-family: var(--mono); color: var(--text-muted);
+    }
+    
+    .switch {
+      position: relative; display: inline-block; width: 34px; height: 18px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--surface-bright); transition: .4s; border-radius: 34px;
       border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 12px; width: 12px; left: 2px; bottom: 2px;
+      background-color: var(--text-muted); transition: .4s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent-glow); border-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(16px); background-color: var(--accent); }
+
+    .emotion-bars { display: flex; flex-direction: column; gap: 10px; }
+    
+    /* Session report button */
+    .btn-report {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent2), #7b2cbf);
+      color: white; border: none; font-weight: 600;
     }
 
-    .card-body { padding: 16px; }
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 2px); }
+      40% { transform: translate(-2px, -2px); }
+      60% { transform: translate(2px, 2px); }
+      80% { transform: translate(2px, -2px); }
+      100% { transform: translate(0); }
+    }
+    .glitch-text:hover { animation: glitch 0.3s infinite; }
 
-    /* Emotion display */
-    .emotion-main {
-      text-align: center;
-      padding: 24px 16px;
-    }
-    .emotion-emoji {
-      font-size: 64px;
-      display: block;
-      margin-bottom: 8px;
-      transition: all 0.3s;
-      filter: drop-shadow(0 0 20px currentColor);
-    }
-    .emotion-name {
-      font-size: 20px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: var(--accent);
-      font-family: var(--mono);
-    }
-    .emotion-confidence {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    /* Emotion bars */
-    .emotion-bars { display: flex; flex-direction: column; gap: 8px; }
-
-    .emotion-bar-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .bar-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      width: 70px;
-      flex-shrink: 0;
-      font-family: var(--mono);
-    }
-    .bar-track {
-      flex: 1;
-      height: 6px;
-      background: var(--surface2);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-    .bar-pct {
-      font-size: 11px;
-      font-family: var(--mono);
-      color: var(--text-muted);
-      width: 36px;
-      text-align: right;
-    }
-
-    /* Face info card */
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .info-item {
-      background: var(--surface2);
-      border-radius: 10px;
-      padding: 12px;
-    }
-    .info-item-label {
-      font-size: 10px;
-      color: var(--text-muted);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-    .info-item-value {
-      font-size: 16px;
-      font-weight: 700;
-      font-family: var(--mono);
-      color: var(--text);
-    }
-
-    /* Stats */
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .stat-row:last-child { border-bottom: none; }
-    .stat-label { font-size: 12px; color: var(--text-muted); }
-    .stat-value { font-size: 13px; font-family: var(--mono); color: var(--text); }
-
-    /* Loading */
-    #loading-screen {
-      position: fixed;
-      inset: 0;
-      background: var(--bg);
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-    }
-    .loader-logo { font-family: var(--mono); font-size: 32px; color: var(--accent); font-weight: 700; }
-    .loader-bar-wrap {
-      width: 260px;
-      height: 3px;
-      background: var(--surface2);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .loader-bar-inner {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      border-radius: 2px;
-      width: 0%;
-      transition: width 0.4s;
-    }
-    .loader-text { font-size: 12px; color: var(--text-muted); font-family: var(--mono); }
-
-    /* Corner scan effect on video */
-    .scan-corners {
-      position: absolute;
-      inset: 12px;
-      pointer-events: none;
-    }
-    .scan-corners::before, .scan-corners::after,
-    .sc2::before, .sc2::after {
-      content: '';
-      position: absolute;
-      width: 20px; height: 20px;
-      border-color: var(--accent);
-      border-style: solid;
-      opacity: 0.6;
-    }
-    .scan-corners::before { top:0;left:0; border-width:2px 0 0 2px; }
-    .scan-corners::after  { top:0;right:0; border-width:2px 2px 0 0; }
-    .sc2::before { bottom:0;left:0; border-width:0 0 2px 2px; }
-    .sc2::after  { bottom:0;right:0; border-width:0 2px 2px 0; }
-
-    .scan-line {
-      position: absolute;
-      left: 12px; right: 12px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0;
-      animation: scan 3s linear infinite;
-    }
-    @keyframes scan {
-      0% { top: 12px; opacity: 0; }
-      10% { opacity: 0.4; }
-      90% { opacity: 0.4; }
-      100% { top: calc(100% - 12px); opacity: 0; }
-    }
-
-    .tag {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-family: var(--mono);
-      background: rgba(79,158,255,0.1);
-      color: var(--accent);
-      border: 1px solid rgba(79,158,255,0.2);
-    }
-
-    .no-face-msg {
-      text-align: center;
-      padding: 20px;
-      color: var(--text-muted);
-      font-size: 13px;
-    }
   </style>
 </head>
 <body>
 
-<!-- Loading screen -->
-<div id="loading-screen">
-  <div class="loader-logo">FaceVision</div>
-  <div class="loader-bar-wrap"><div class="loader-bar-inner" id="loader-bar"></div></div>
-  <div class="loader-text" id="loader-text">AI modellari yuklanmoqda...</div>
+<div id="loading-screen" style="z-index: 9999">
+  <div class="loader-logo" style="letter-spacing: 4px">FACEVISION PRO</div>
+  <div class="loader-bar-wrap" style="width: 300px"><div class="loader-bar-inner" id="loader-bar"></div></div>
+  <div class="loader-text" id="loader-text">Initializing AI Core...</div>
 </div>
 
 <div class="orb orb1"></div>
@@ -477,126 +172,126 @@
 
 <header>
   <div class="logo">
-    <div class="logo-icon">👁</div>
+    <div class="logo-icon" style="border-radius: 50%; background: var(--accent); color: #000; border: none">PRO</div>
     <div>
-      <div class="logo-text">FaceVision</div>
-      <div class="logo-sub">Emotion Recognition</div>
+      <div class="logo-text glitch-text">FaceVision <span style="color: var(--accent2)">Pro</span></div>
+      <div class="logo-sub">Advanced Intelligence</div>
     </div>
   </div>
   <div class="status-badge">
     <div class="status-dot" id="status-dot"></div>
-    <span id="status-text">Tayyor emas</span>
+    <span id="status-text">System Standby</span>
   </div>
 </header>
 
 <main>
-  <div class="hero">
-    <h1>Yuz va His-tuyg'u Tahlili</h1>
-    <p>Real vaqtda yuzni aniqlash va 7 xil his-tuyg'uni tahlil qilish — sun'iy intellekt texnologiyasi asosida</p>
-  </div>
-
   <div class="app-grid">
-    <!-- Camera panel -->
-    <div class="camera-panel">
-      <div class="panel-header">
-        <div class="panel-dot dot-red"></div>
-        <div class="panel-dot dot-yellow"></div>
-        <div class="panel-dot dot-green"></div>
-        <span class="panel-title" style="margin-left:8px">Kamera oqimi — Real vaqt</span>
-      </div>
-      <div class="camera-wrapper" id="camera-wrapper">
-        <div class="camera-placeholder" id="placeholder">
-          <div class="icon">📷</div>
-          <p>Kamerani yoqish uchun<br>quyidagi tugmani bosing</p>
+    <!-- Column 1: Stage -->
+    <div class="main-stage">
+      <div class="glass-card">
+        <div class="panel-header">
+          <div class="panel-dot dot-red"></div>
+          <div class="panel-dot dot-yellow"></div>
+          <div class="panel-dot dot-green"></div>
+          <span class="panel-title" style="margin-left:8px">Optical Sensor Feed</span>
+          <div style="flex: 1"></div>
+          <div class="toggle-wrap">
+            <span>Mesh</span>
+            <label class="switch">
+              <input type="checkbox" id="check-mesh" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-wrap" style="margin-left:12px">
+            <span>Voice</span>
+            <label class="switch">
+              <input type="checkbox" id="check-voice">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
-        <div id="video-container" style="display:none">
-          <video id="video" autoplay muted playsinline></video>
-          <canvas id="overlay"></canvas>
-          <div class="scan-corners"></div>
-          <div class="scan-corners sc2"></div>
+        <div class="camera-wrapper" id="camera-wrapper">
+          <div class="camera-placeholder" id="placeholder">
+            <div class="icon">🛰</div>
+            <p>Ready to initialize optical stream</p>
+            <button class="btn primary" onclick="startCamera()" style="max-width: 200px">Initialize System</button>
+          </div>
+          <div id="video-container" style="display:none">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="overlay"></canvas>
+            <div class="scan-corners"></div>
+            <div class="scan-corners sc2"></div>
+          </div>
+          <div class="scan-line" id="scan-line" style="display:none; width: 100%"></div>
         </div>
-        <div class="scan-line" id="scan-line" style="display:none; width: 100%"></div>
+        <div class="camera-controls">
+          <button class="btn" id="btn-start" onclick="startCamera()" style="display:none">▶ Start</button>
+          <button class="btn primary" id="btn-snapshot" onclick="takeSnapshot()" disabled>📸 Snapshot</button>
+          <button class="btn danger" id="btn-stop" onclick="stopCamera()" disabled>■ Shut Down</button>
+        </div>
       </div>
-      <div class="camera-controls">
-        <button class="btn primary" id="btn-start" onclick="startCamera()">▶ Kamerani yoqish</button>
-        <button class="btn danger" id="btn-stop" onclick="stopCamera()" disabled>■ To'xtatish</button>
-        <button class="btn" id="btn-snapshot" onclick="takeSnapshot()" disabled>📸 Snapshot</button>
+
+      <!-- Gallery -->
+      <div class="glass-card">
+        <div class="panel-header">
+          <span class="panel-title">Session Gallery</span>
+        </div>
+        <div class="card-body">
+          <div class="gallery-container" id="gallery">
+            <div class="no-face-msg" style="width: 100%">No snapshots captured yet.</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Sidebar -->
+    <!-- Column 2: Dashboard -->
     <div class="sidebar">
-      <!-- Main emotion -->
-      <div class="card">
-        <div class="panel-header">
-          <span class="panel-title">Asosiy his-tuyg'u</span>
-        </div>
+      <div class="glass-card">
+        <div class="panel-header"><span class="panel-title">Core Intelligence</span></div>
         <div class="emotion-main" id="emotion-main">
           <span class="emotion-emoji" id="emotion-emoji">😶</span>
-          <div class="emotion-name" id="emotion-name">Kutilmoqda</div>
-          <div class="emotion-confidence" id="emotion-conf">Kamera yoqilmagan</div>
+          <div class="emotion-name" id="emotion-name">Standby</div>
+          <div class="emotion-confidence" id="emotion-conf">Waiting for input...</div>
         </div>
       </div>
 
-      <!-- All emotions -->
-      <div class="card">
-        <div class="panel-header">
-          <span class="panel-title">Barcha his-tuyg'ular</span>
-        </div>
+      <div class="glass-card">
+        <div class="panel-header"><span class="panel-title">Real-time Metrics</span></div>
         <div class="card-body">
           <div class="emotion-bars" id="emotion-bars">
-            <div class="no-face-msg">Kamerani yoqing va yuzingizni ko'rsating</div>
+            <div class="no-face-msg">Activate camera to stream telemetry</div>
+          </div>
+          <div class="chart-container">
+            <canvas id="emotionChart"></canvas>
           </div>
         </div>
       </div>
 
-      <!-- Face info -->
-      <div class="card">
-        <div class="panel-header">
-          <span class="panel-title">Yuz ma'lumotlari</span>
-        </div>
+      <div class="glass-card">
+        <div class="panel-header"><span class="panel-title">Biometric Data</span></div>
         <div class="card-body">
           <div class="info-grid">
             <div class="info-item">
-              <div class="info-item-label">Yuzlar soni</div>
-              <div class="info-item-value" id="face-count">—</div>
+              <div class="info-item-label">Entities</div>
+              <div class="info-item-value" id="face-count">0</div>
             </div>
             <div class="info-item">
-              <div class="info-item-label">FPS</div>
-              <div class="info-item-value" id="fps-val">—</div>
+              <div class="info-item-label">Freq</div>
+              <div class="info-item-value" id="fps-val">0</div>
             </div>
             <div class="info-item">
-              <div class="info-item-label">Yosh (taxm.)</div>
+              <div class="info-item-label">Est. Age</div>
               <div class="info-item-value" id="age-val">—</div>
             </div>
             <div class="info-item">
-              <div class="info-item-label">Jins (taxm.)</div>
+              <div class="info-item-label">Gender</div>
               <div class="info-item-value" id="gender-val">—</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Session stats -->
-      <div class="card">
-        <div class="panel-header">
-          <span class="panel-title">Sessiya statistikasi</span>
-        </div>
-        <div class="card-body">
-          <div class="stat-row">
-            <span class="stat-label">Tahlil qilingan kadrlar</span>
-            <span class="stat-value" id="stat-frames">0</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Ko'p uchraydigan his</span>
-            <span class="stat-value" id="stat-top">—</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Texnologiya</span>
-            <span class="stat-value"><span class="tag">face-api.js</span></span>
-          </div>
-        </div>
-      </div>
+      <button class="btn btn-report" id="btn-report" onclick="generateReport()" disabled>📊 Export Session Analytics</button>
     </div>
   </div>
 </main>
@@ -611,6 +306,13 @@ let lastFpsTime = Date.now();
 let lastUiUpdateTime = 0;
 let fpsVal = 0;
 let emotionStats = {};
+let gallery = [];
+let emotionChart = null;
+let lastSpokenEmotion = '';
+let emotionDataBuffer = {
+  labels: [],
+  datasets: []
+};
 
 const EMOTIONS_UZ = {
   neutral:   { uz: 'Neytral',    emoji: '😐', color: '#7a8499' },
@@ -622,13 +324,43 @@ const EMOTIONS_UZ = {
   surprised: { uz: 'Hayron',     emoji: '😮', color: '#ffb347' },
 };
 
+// Intialize Chart
+function initChart() {
+  const ctx = document.getElementById('emotionChart').getContext('2d');
+  const datasets = Object.keys(EMOTIONS_UZ).map(key => ({
+    label: EMOTIONS_UZ[key].uz,
+    data: [],
+    borderColor: EMOTIONS_UZ[key].color,
+    backgroundColor: EMOTIONS_UZ[key].color + '22',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0.4,
+    fill: false
+  }));
+
+  emotionChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        y: { beginAtZero: true, max: 1, display: false },
+        x: { display: false }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
 // Loading models
 async function loadModels() {
   const steps = [
-    { text: 'Face Detector modeli...', pct: 25, load: () => faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL) },
-    { text: 'Yuz orientiri modeli...', pct: 50, load: () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL) },
-    { text: 'His-tuyg\'u modeli...', pct: 75, load: () => faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) },
-    { text: 'Yosh/jins modeli...', pct: 90, load: () => faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL) },
+    { text: 'Loading Neural Core...', pct: 25, load: () => faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL) },
+    { text: 'Mapping Landmarks...', pct: 50, load: () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL) },
+    { text: 'Calibrating Expressions...', pct: 75, load: () => faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) },
+    { text: 'Determining Biometrics...', pct: 90, load: () => faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL) },
   ];
 
   const bar = document.getElementById('loader-bar');
@@ -640,30 +372,20 @@ async function loadModels() {
       await step.load();
       bar.style.width = step.pct + '%';
     }
-
-    txt.textContent = 'Tayyorlanmoqda...';
+    
+    txt.textContent = 'System Ready';
     bar.style.width = '100%';
+    initChart();
     
-    await new Promise(r => setTimeout(r, 600));
-    const loadingScreen = document.getElementById('loading-screen');
-    loadingScreen.style.opacity = '0';
-    loadingScreen.style.transition = 'opacity 0.5s';
-    setTimeout(() => loadingScreen.style.display = 'none', 500);
-
-    setStatus(true, 'Tayyor');
+    setTimeout(() => {
+      const loadingScreen = document.getElementById('loading-screen');
+      loadingScreen.style.opacity = '0';
+      setTimeout(() => loadingScreen.style.display = 'none', 500);
+      setStatus(true, 'System Standby');
+    }, 600);
   } catch (e) {
-    console.error("Model yuklashda xatolik:", e);
-    txt.textContent = 'Xatolik! Internetni tekshiring yoki Live Server orqali oching.';
-    txt.style.color = 'var(--danger)';
-    bar.style.background = 'var(--danger)';
-    
-    // Detailed error for debugging
-    const errorMsg = document.createElement('div');
-    errorMsg.style.fontSize = '10px';
-    errorMsg.style.marginTop = '10px';
-    errorMsg.style.color = 'var(--text-muted)';
-    errorMsg.textContent = e.message || 'Noma\'lum xatolik';
-    txt.parentElement.appendChild(errorMsg);
+    console.error("Initialization Failed:", e);
+    txt.textContent = 'Hardware Failure. Check connections.';
   }
 }
 
@@ -673,7 +395,6 @@ function setStatus(active, text) {
 }
 
 async function startCamera() {
-  console.log("Kamera so'ralmoqda...");
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 } } });
     const video = document.getElementById('video');
@@ -681,23 +402,20 @@ async function startCamera() {
     
     document.getElementById('video-container').style.display = 'inline-block';
     document.getElementById('placeholder').style.display = 'none';
-    document.getElementById('scan-line').style.display = 'block';
-    document.getElementById('btn-start').disabled = true;
-    document.getElementById('btn-stop').disabled = false;
     document.getElementById('btn-snapshot').disabled = false;
+    document.getElementById('btn-stop').disabled = false;
+    document.getElementById('btn-report').disabled = false;
 
     video.onloadedmetadata = () => {
-      console.log("Kamera stream boshlandi:", video.videoWidth, "x", video.videoHeight);
       const canvas = document.getElementById('overlay');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       detecting = true;
-      setStatus(true, 'Jonli tahlil');
+      setStatus(true, 'Active Stream');
       detectLoop();
     };
   } catch(e) {
-    console.error("Kamerada xatolik:", e);
-    alert('Kameraga ruxsat berilmadi yoki xatolik yuz berdi. Iltimos, HTTPS orqali yoki local serverda ishga tushiring.');
+    alert('Optical sensor access denied. HTTPS required.');
   }
 }
 
@@ -707,25 +425,27 @@ function stopCamera() {
   stream = null;
   document.getElementById('video-container').style.display = 'none';
   document.getElementById('placeholder').style.display = 'flex';
-  document.getElementById('scan-line').style.display = 'none';
-  document.getElementById('btn-start').disabled = false;
-  document.getElementById('btn-stop').disabled = true;
   document.getElementById('btn-snapshot').disabled = true;
-  setStatus(true, 'Tayyor');
+  document.getElementById('btn-stop').disabled = true;
+  setStatus(true, 'System Standby');
   resetUI();
 }
 
 function resetUI() {
   document.getElementById('emotion-emoji').textContent = '😶';
-  document.getElementById('emotion-name').textContent = 'Kutilmoqda';
-  document.getElementById('emotion-conf').textContent = 'Kamera yoqilmagan';
-  document.getElementById('face-count').textContent = '—';
-  document.getElementById('fps-val').textContent = '—';
-  document.getElementById('age-val').textContent = '—';
-  document.getElementById('gender-val').textContent = '—';
-  document.getElementById('emotion-bars').innerHTML = '<div class="no-face-msg">Kamerani yoqing va yuzingizni ko\'rsating</div>';
+  document.getElementById('emotion-name').textContent = 'Standby';
+  document.getElementById('face-count').textContent = '0';
   const canvas = document.getElementById('overlay');
   canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+
+function speak(text) {
+  if (!document.getElementById('check-voice').checked) return;
+  const synth = window.speechSynthesis;
+  if (synth.speaking) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'uz-UZ';
+  synth.speak(utter);
 }
 
 async function detectLoop() {
@@ -741,116 +461,82 @@ async function detectLoop() {
     .withAgeAndGender();
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Stats calculation
-  totalFrames++;
+  
   frameCount++;
+  totalFrames++;
   const now = Date.now();
   
-  // FPS update (once per second)
   if (now - lastFpsTime >= 1000) {
-    fpsVal = frameCount;
-    frameCount = 0;
-    lastFpsTime = now;
+    fpsVal = frameCount; frameCount = 0; lastFpsTime = now;
     document.getElementById('fps-val').textContent = fpsVal;
-    document.getElementById('stat-frames').textContent = totalFrames;
   }
 
-  if (detections.length === 0) {
-    if (now - lastUiUpdateTime > 200) {
-      document.getElementById('emotion-emoji').textContent = '🔍';
-      document.getElementById('emotion-name').textContent = 'Yuz topilmadi';
-      document.getElementById('emotion-conf').textContent = 'Kameraga yaqinroq keling';
-      document.getElementById('emotion-bars').innerHTML = '<div class="no-face-msg">Yuz aniqlanmadi</div>';
-      document.getElementById('age-val').textContent = '—';
-      document.getElementById('gender-val').textContent = '—';
-      lastUiUpdateTime = now;
-    }
-    document.getElementById('face-count').textContent = '0';
-  } else {
-    // Sort detections by area (to pick the most prominent face)
-    const sortedDetections = detections.sort((a, b) => (b.detection.box.width * b.detection.box.height) - (a.detection.box.width * a.detection.box.height));
-    const d = sortedDetections[0];
-    const box = d.detection.box;
-    const expressions = d.expressions;
-
+  if (detections.length > 0) {
     document.getElementById('face-count').textContent = detections.length;
+    
+    // Pick main face
+    const sorted = detections.sort((a,b) => b.detection.box.area - a.detection.box.area);
+    const main = sorted[0];
+    const box = main.detection.box;
+    const expressions = main.expressions;
 
-    // Draw all boxes first
-    detections.forEach(det => {
-      const b = det.detection.box;
-      ctx.strokeStyle = '#4f9eff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.x, b.y, b.width, b.height);
-    });
+    // Draw Mesh if enabled
+    if (document.getElementById('check-mesh').checked) {
+      faceapi.draw.drawFaceLandmarks(canvas, detections);
+    }
 
-    // Highlight main face
-    ctx.strokeStyle = '#4f9eff';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = '#4f9eff';
-    ctx.shadowBlur = 10;
-    ctx.strokeRect(box.x, box.y, box.width, box.height);
-    ctx.shadowBlur = 0;
-
-    // Corner brackets for main face
-    const cs = 16;
-    ctx.lineWidth = 4;
-    [[box.x, box.y, 1, 1], [box.x+box.width, box.y, -1, 1],
-     [box.x, box.y+box.height, 1, -1], [box.x+box.width, box.y+box.height, -1, -1]].forEach(([x,y,dx,dy]) => {
-      ctx.beginPath();
-      ctx.moveTo(x + dx*cs, y);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x, y + dy*cs);
-      ctx.stroke();
-    });
-
-    // Top emotion
-    const sortedEmotions = Object.entries(expressions).sort((a,b) => b[1]-a[1]);
-    const [topEmotion, topConf] = sortedEmotions[0];
-    const info = EMOTIONS_UZ[topEmotion] || { uz: topEmotion, emoji: '😶', color: '#fff' };
-
-    // Update UI (throttled to 5 times per second)
+    // Dynamic UI Updates (Throttled)
     if (now - lastUiUpdateTime > 200) {
+      const top = Object.entries(expressions).sort((a,b) => b[1]-a[1])[0];
+      const info = EMOTIONS_UZ[top[0]] || { uz: top[0], emoji: '•', color: '#fff' };
+      
       document.getElementById('emotion-emoji').textContent = info.emoji;
       document.getElementById('emotion-name').textContent = info.uz;
       document.getElementById('emotion-name').style.color = info.color;
-      document.getElementById('emotion-conf').textContent = `Ishonch: ${(topConf*100).toFixed(1)}%`;
+      document.getElementById('emotion-conf').textContent = `Confidence: ${(top[1]*100).toFixed(1)}%`;
+      document.getElementById('age-val').textContent = Math.round(main.age);
+      document.getElementById('gender-val').textContent = main.gender === 'male' ? 'Male' : 'Female';
 
-      document.getElementById('age-val').textContent = Math.round(d.age);
-      const genderUz = d.gender === 'male' ? 'Erkak' : 'Ayol';
-      document.getElementById('gender-val').textContent = genderUz;
-
-      let barsHtml = '';
-      sortedEmotions.forEach(([emo, val]) => {
-        const ei = EMOTIONS_UZ[emo] || { uz: emo, emoji: '•', color: '#666' };
-        barsHtml += `
-          <div class="emotion-bar-row">
-            <span class="bar-label">${ei.emoji} ${ei.uz}</span>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${(val*100).toFixed(1)}%;background:${ei.color}"></div>
-            </div>
-            <span class="bar-pct">${(val*100).toFixed(0)}%</span>
-          </div>`;
-      });
-      document.getElementById('emotion-bars').innerHTML = barsHtml;
-
-      // Update session stats
-      emotionStats[topEmotion] = (emotionStats[topEmotion] || 0) + 1;
-      const topStat = Object.entries(emotionStats).sort((a,b)=>b[1]-a[1])[0];
-      if (topStat) {
-        const ti = EMOTIONS_UZ[topStat[0]];
-        document.getElementById('stat-top').textContent = `${ti?.emoji || ''} ${ti?.uz || topStat[0]}`;
+      // Voice feedback
+      if (top[1] > 0.7 && info.uz !== lastSpokenEmotion) {
+        speak(`Siz ${info.uz} ko'rinasiz`);
+        lastSpokenEmotion = info.uz;
       }
+
+      // Update Chart
+      if (emotionChart) {
+        emotionChart.data.labels.push('');
+        if (emotionChart.data.labels.length > 30) {
+          emotionChart.data.labels.shift();
+          emotionChart.data.datasets.forEach(d => d.data.shift());
+        }
+        emotionChart.data.datasets.forEach(dataset => {
+          const key = Object.keys(EMOTIONS_UZ).find(k => EMOTIONS_UZ[k].uz === dataset.label);
+          dataset.data.push(expressions[key] || 0);
+        });
+        emotionChart.update();
+      }
+
+      // Update Bars
+      let bars = '';
+      Object.entries(expressions).sort((a,b)=>b[1]-a[1]).forEach(([emo, val]) => {
+        const ei = EMOTIONS_UZ[emo] || { uz: emo, emoji: '•', color: '#666' };
+        bars += `<div class="emotion-bar-row">
+          <span class="bar-label">${ei.emoji} ${ei.uz}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${(val*100)}%; background:${ei.color}"></div></div>
+          <span class="bar-pct">${(val*100).toFixed(0)}%</span>
+        </div>`;
+      });
+      document.getElementById('emotion-bars').innerHTML = bars;
       
       lastUiUpdateTime = now;
     }
 
-    // Label on canvas (always update for smoothness)
-    ctx.fillStyle = 'rgba(5,7,15,0.85)';
-    ctx.fillRect(box.x, box.y - 35, box.width, 32);
-    ctx.fillStyle = info.color;
-    ctx.font = 'bold 14px Space Mono, monospace';
-    ctx.fillText(`${info.emoji} ${info.uz} ${(topConf*100).toFixed(0)}%`, box.x + 8, box.y - 14);
+    // Custom Canvas Overlay for main face
+    ctx.strokeStyle = '#4f9eff'; ctx.lineWidth = 2;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+  } else {
+    document.getElementById('face-count').textContent = '0';
   }
 
   requestAnimationFrame(detectLoop);
@@ -859,29 +545,42 @@ async function detectLoop() {
 function takeSnapshot() {
   const video = document.getElementById('video');
   const overlay = document.getElementById('overlay');
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = video.videoWidth; offCanvas.height = video.videoHeight;
+  const ctx = offCanvas.getContext('2d');
   
-  // Mirror-mode: video va overlayni birga mirror qilib chizish
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.drawImage(video, -canvas.width, 0);
-  ctx.drawImage(overlay, -canvas.width, 0);
+  ctx.save(); ctx.scale(-1, 1);
+  ctx.drawImage(video, -offCanvas.width, 0);
+  ctx.drawImage(overlay, -offCanvas.width, 0);
   ctx.restore();
-  
-  const link = document.createElement('a');
-  link.download = `facevision_snapshot_${Date.now()}.png`;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
+
+  const dataUrl = offCanvas.toDataURL();
+  addToGallery(dataUrl);
 }
 
-// Start loading
-loadModels().catch(e => {
-  document.getElementById('loader-text').textContent = 'Xatolik! Internet tekshiring.';
-  console.error(e);
-});
+function addToGallery(src) {
+  const container = document.getElementById('gallery');
+  if (gallery.length === 0) container.innerHTML = '';
+  
+  const div = document.createElement('div');
+  div.className = 'gallery-item';
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  div.innerHTML = `<img src="${src}"><div class="gallery-time">${time}</div>`;
+  div.onclick = () => {
+    const a = document.createElement('a');
+    a.href = src; a.download = `facevision_snapshot_${Date.now()}.png`;
+    a.click();
+  };
+  container.prepend(div);
+  gallery.push(src);
+}
+
+function generateReport() {
+  alert('Session Analytics exported to Console (F12). Production CSV export coming soon.');
+  console.table(emotionStats);
+}
+
+loadModels();
 </script>
 </body>
 </html>
