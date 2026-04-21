@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FaceVision — Yuz va His-tuyg'u Tahlili</title>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+    :root {
+      --bg: #05070f;
+      --surface: #0d1120;
+      --surface2: #131828;
+      --border: rgba(100,180,255,0.12);
+      --accent: #4f9eff;
+      --accent2: #a259ff;
+      --green: #2affa0;
+      --warn: #ffb347;
+      --danger: #ff5c5c;
+      --text: #e8eaf0;
+      --text-muted: #7a8499;
+      --mono: 'Space Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,158,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,158,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb1 { width: 400px; height: 400px; top: -100px; left: -100px; background: rgba(79,158,255,0.07); }
+    .orb2 { width: 300px; height: 300px; bottom: 0; right: -50px; background: rgba(162,89,255,0.07); }
+
+    header {
+      position: relative;
+      z-index: 1;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
+      background: rgba(5,7,15,0.6);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo-text {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: all 0.3s;
+    }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 700;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #fff 30%, var(--accent) 70%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    @media (max-width: 800px) {
+      .app-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Camera panel */
+    .camera-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .panel-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green { background: #28c840; }
+
+    .camera-wrapper {
+      position: relative;
+      background: #000;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #video {
+      width: 100%;
+      height: auto;
+      display: block;
+      transform: scaleX(-1);
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      transform: scaleX(-1);
+    }
+
+    .camera-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: var(--text-muted);
+      padding: 60px 20px;
+    }
+    .camera-placeholder .icon { font-size: 48px; opacity: 0.4; }
+    .camera-placeholder p { font-size: 14px; text-align: center; }
+
+    .camera-controls {
+      padding: 16px 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+    .btn.primary:hover { background: #3d8fff; transform: translateY(-1px); }
+    .btn.danger { border-color: var(--danger); color: var(--danger); }
+    .btn.danger:hover { background: rgba(255,92,92,0.1); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Sidebar */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .card-body { padding: 16px; }
+
+    /* Emotion display */
+    .emotion-main {
+      text-align: center;
+      padding: 24px 16px;
+    }
+    .emotion-emoji {
+      font-size: 64px;
+      display: block;
+      margin-bottom: 8px;
+      transition: all 0.3s;
+      filter: drop-shadow(0 0 20px currentColor);
+    }
+    .emotion-name {
+      font-size: 20px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+    .emotion-confidence {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Emotion bars */
+    .emotion-bars { display: flex; flex-direction: column; gap: 8px; }
+
+    .emotion-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      width: 70px;
+      flex-shrink: 0;
+      font-family: var(--mono);
+    }
+    .bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .bar-pct {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--text-muted);
+      width: 36px;
+      text-align: right;
+    }
+
+    /* Face info card */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .info-item {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .info-item-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .info-item-value {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    /* Stats */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { font-size: 12px; color: var(--text-muted); }
+    .stat-value { font-size: 13px; font-family: var(--mono); color: var(--text); }
+
+    /* Loading */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+    .loader-logo { font-family: var(--mono); font-size: 32px; color: var(--accent); font-weight: 700; }
+    .loader-bar-wrap {
+      width: 260px;
+      height: 3px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loader-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.4s;
+    }
+    .loader-text { font-size: 12px; color: var(--text-muted); font-family: var(--mono); }
+
+    /* Corner scan effect on video */
+    .scan-corners {
+      position: absolute;
+      inset: 12px;
+      pointer-events: none;
+    }
+    .scan-corners::before, .scan-corners::after,
+    .sc2::before, .sc2::after {
+      content: '';
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: var(--accent);
+      border-style: solid;
+      opacity: 0.6;
+    }
+    .scan-corners::before { top:0;left:0; border-width:2px 0 0 2px; }
+    .scan-corners::after  { top:0;right:0; border-width:2px 2px 0 0; }
+    .sc2::before { bottom:0;left:0; border-width:0 0 2px 2px; }
+    .sc2::after  { bottom:0;right:0; border-width:0 2px 2px 0; }
+
+    .scan-line {
+      position: absolute;
+      left: 12px; right: 12px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0;
+      animation: scan 3s linear infinite;
+    }
+    @keyframes scan {
+      0% { top: 12px; opacity: 0; }
+      10% { opacity: 0.4; }
+      90% { opacity: 0.4; }
+      100% { top: calc(100% - 12px); opacity: 0; }
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--mono);
+      background: rgba(79,158,255,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(79,158,255,0.2);
+    }
+
+    .no-face-msg {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading-screen">
+  <div class="loader-logo">FaceVision</div>
+  <div class="loader-bar-wrap"><div class="loader-bar-inner" id="loader-bar"></div></div>
+  <div class="loader-text" id="loader-text">AI modellari yuklanmoqda...</div>
+</div>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">👁</div>
+    <div>
+      <div class="logo-text">FaceVision</div>
+      <div class="logo-sub">Emotion Recognition</div>
+    </div>
+  </div>
+  <div class="status-badge">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Tayyor emas</span>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Yuz va His-tuyg'u Tahlili</h1>
+    <p>Real vaqtda yuzni aniqlash va 7 xil his-tuyg'uni tahlil qilish — sun'iy intellekt texnologiyasi asosida</p>
+  </div>
+
+  <div class="app-grid">
+    <!-- Camera panel -->
+    <div class="camera-panel">
+      <div class="panel-header">
+        <div class="panel-dot dot-red"></div>
+        <div class="panel-dot dot-yellow"></div>
+        <div class="panel-dot dot-green"></div>
+        <span class="panel-title" style="margin-left:8px">Kamera oqimi — Real vaqt</span>
+      </div>
+      <div class="camera-wrapper" id="camera-wrapper">
+        <div class="camera-placeholder" id="placeholder">
+          <div class="icon">📷</div>
+          <p>Kamerani yoqish uchun<br>quyidagi tugmani bosing</p>
+        </div>
+        <video id="video" autoplay muted playsinline style="display:none"></video>
+        <canvas id="overlay"></canvas>
+        <div class="scan-corners"></div>
+        <div class="scan-corners sc2"></div>
+        <div class="scan-line" id="scan-line" style="display:none"></div>
+      </div>
+      <div class="camera-controls">
+        <button class="btn primary" id="btn-start" onclick="startCamera()">▶ Kamerani yoqish</button>
+        <button class="btn danger" id="btn-stop" onclick="stopCamera()" disabled>■ To'xtatish</button>
+        <button class="btn" id="btn-snapshot" onclick="takeSnapshot()" disabled>📸 Snapshot</button>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Main emotion -->
+      <div class="card">
+        <div class="panel-header">
+          <span class="panel-title">Asosiy his-tuyg'u</span>
+        </div>
+        <div class="emotion-main" id="emotion-main">
+          <span class="emotion-emoji" id="emotion-emoji">😶</span>
+          <div class="emotion-name" id="emotion-name">Kutilmoqda</div>
+          <div class="emotion-confidence" id="emotion-conf">Kamera yoqilmagan</div>
+        </div>
+      </div>
+
+      <!-- All emotions -->
+      <div class="card">
+        <div class="panel-header">
+          <span class="panel-title">Barcha his-tuyg'ular</span>
+        </div>
+        <div class="card-body">
+          <div class="emotion-bars" id="emotion-bars">
+            <div class="no-face-msg">Kamerani yoqing va yuzingizni ko'rsating</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Face info -->
+      <div class="card">
+        <div class="panel-header">
+          <span class="panel-title">Yuz ma'lumotlari</span>
+        </div>
+        <div class="card-body">
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-item-label">Yuzlar soni</div>
+              <div class="info-item-value" id="face-count">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">FPS</div>
+              <div class="info-item-value" id="fps-val">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">Yosh (taxm.)</div>
+              <div class="info-item-value" id="age-val">—</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">Jins (taxm.)</div>
+              <div class="info-item-value" id="gender-val">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session stats -->
+      <div class="card">
+        <div class="panel-header">
+          <span class="panel-title">Sessiya statistikasi</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row">
+            <span class="stat-label">Tahlil qilingan kadrlar</span>
+            <span class="stat-value" id="stat-frames">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Ko'p uchraydigan his</span>
+            <span class="stat-value" id="stat-top">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Texnologiya</span>
+            <span class="stat-value"><span class="tag">face-api.js</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const MODEL_URL = 'https://vladmandic.github.io/face-api/model/';
+let stream = null;
+let detecting = false;
+let frameCount = 0;
+let totalFrames = 0;
+let lastFpsTime = Date.now();
+let lastUiUpdateTime = 0;
+let fpsVal = 0;
+let emotionStats = {};
+
+const EMOTIONS_UZ = {
+  neutral:   { uz: 'Neytral',    emoji: '😐', color: '#7a8499' },
+  happy:     { uz: 'Xursand',    emoji: '😄', color: '#2affa0' },
+  sad:       { uz: 'G\'amgin',   emoji: '😢', color: '#4f9eff' },
+  angry:     { uz: 'G\'azablangan', emoji: '😠', color: '#ff5c5c' },
+  fearful:   { uz: 'Qo\'rqqan', emoji: '😨', color: '#a259ff' },
+  disgusted: { uz: 'Jirkanch',   emoji: '🤢', color: '#28c840' },
+  surprised: { uz: 'Hayron',     emoji: '😮', color: '#ffb347' },
+};
+
+// Loading models
+async function loadModels() {
+  const steps = [
+    { text: 'SSD MobileNet modeli...', pct: 20, load: () => faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL) },
+    { text: 'Yuz orientiri modeli...', pct: 45, load: () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL) },
+    { text: 'His-tuyg\'u modeli...', pct: 65, load: () => faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) },
+    { text: 'Yosh/jins modeli...', pct: 85, load: () => faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL) },
+  ];
+
+  const bar = document.getElementById('loader-bar');
+  const txt = document.getElementById('loader-text');
+
+  try {
+    for (const step of steps) {
+      txt.textContent = step.text;
+      await step.load();
+      bar.style.width = step.pct + '%';
+    }
+
+    txt.textContent = 'Tayyorlanmoqda...';
+    bar.style.width = '100%';
+    
+    await new Promise(r => setTimeout(r, 600));
+    const loadingScreen = document.getElementById('loading-screen');
+    loadingScreen.style.opacity = '0';
+    loadingScreen.style.transition = 'opacity 0.5s';
+    setTimeout(() => loadingScreen.style.display = 'none', 500);
+
+    setStatus(true, 'Tayyor');
+  } catch (e) {
+    console.error("Model yuklashda xatolik:", e);
+    txt.textContent = 'Xatolik! Internetni tekshiring yoki Live Server orqali oching.';
+    txt.style.color = 'var(--danger)';
+    bar.style.background = 'var(--danger)';
+    
+    // Detailed error for debugging
+    const errorMsg = document.createElement('div');
+    errorMsg.style.fontSize = '10px';
+    errorMsg.style.marginTop = '10px';
+    errorMsg.style.color = 'var(--text-muted)';
+    errorMsg.textContent = e.message || 'Noma\'lum xatolik';
+    txt.parentElement.appendChild(errorMsg);
+  }
+}
+
+function setStatus(active, text) {
+  document.getElementById('status-dot').className = 'status-dot' + (active ? ' active' : '');
+  document.getElementById('status-text').textContent = text;
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('scan-line').style.display = 'block';
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-stop').disabled = false;
+    document.getElementById('btn-snapshot').disabled = false;
+
+    video.onloadedmetadata = () => {
+      const canvas = document.getElementById('overlay');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      detecting = true;
+      setStatus(true, 'Jonli tahlil');
+      detectLoop();
+    };
+  } catch(e) {
+    alert('Kameraga ruxsat berilmadi. HTTPS yoki localhost kerak.');
+  }
+}
+
+function stopCamera() {
+  detecting = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  document.getElementById('video').style.display = 'none';
+  document.getElementById('placeholder').style.display = 'flex';
+  document.getElementById('scan-line').style.display = 'none';
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+  document.getElementById('btn-snapshot').disabled = true;
+  setStatus(true, 'Tayyor');
+  resetUI();
+}
+
+function resetUI() {
+  document.getElementById('emotion-emoji').textContent = '😶';
+  document.getElementById('emotion-name').textContent = 'Kutilmoqda';
+  document.getElementById('emotion-conf').textContent = 'Kamera yoqilmagan';
+  document.getElementById('face-count').textContent = '—';
+  document.getElementById('fps-val').textContent = '—';
+  document.getElementById('age-val').textContent = '—';
+  document.getElementById('gender-val').textContent = '—';
+  document.getElementById('emotion-bars').innerHTML = '<div class="no-face-msg">Kamerani yoqing va yuzingizni ko\'rsating</div>';
+  const canvas = document.getElementById('overlay');
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+
+async function detectLoop() {
+  if (!detecting) return;
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+
+  const detections = await faceapi
+    .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+    .withFaceLandmarks()
+    .withFaceExpressions()
+    .withAgeAndGender();
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Stats calculation
+  totalFrames++;
+  frameCount++;
+  const now = Date.now();
+  
+  // FPS update (once per second)
+  if (now - lastFpsTime >= 1000) {
+    fpsVal = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+    document.getElementById('fps-val').textContent = fpsVal;
+    document.getElementById('stat-frames').textContent = totalFrames;
+  }
+
+  if (detections.length === 0) {
+    if (now - lastUiUpdateTime > 200) {
+      document.getElementById('emotion-emoji').textContent = '🔍';
+      document.getElementById('emotion-name').textContent = 'Yuz topilmadi';
+      document.getElementById('emotion-conf').textContent = 'Kameraga yaqinroq keling';
+      document.getElementById('emotion-bars').innerHTML = '<div class="no-face-msg">Yuz aniqlanmadi</div>';
+      document.getElementById('age-val').textContent = '—';
+      document.getElementById('gender-val').textContent = '—';
+      lastUiUpdateTime = now;
+    }
+    document.getElementById('face-count').textContent = '0';
+  } else {
+    // Sort detections by area (to pick the most prominent face)
+    const sortedDetections = detections.sort((a, b) => (b.detection.box.width * b.detection.box.height) - (a.detection.box.width * a.detection.box.height));
+    const d = sortedDetections[0];
+    const box = d.detection.box;
+    const expressions = d.expressions;
+
+    document.getElementById('face-count').textContent = detections.length;
+
+    // Draw all boxes first
+    detections.forEach(det => {
+      const b = det.detection.box;
+      ctx.strokeStyle = '#4f9eff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(b.x, b.y, b.width, b.height);
+    });
+
+    // Highlight main face
+    ctx.strokeStyle = '#4f9eff';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#4f9eff';
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    ctx.shadowBlur = 0;
+
+    // Corner brackets for main face
+    const cs = 16;
+    ctx.lineWidth = 4;
+    [[box.x, box.y, 1, 1], [box.x+box.width, box.y, -1, 1],
+     [box.x, box.y+box.height, 1, -1], [box.x+box.width, box.y+box.height, -1, -1]].forEach(([x,y,dx,dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(x + dx*cs, y);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y + dy*cs);
+      ctx.stroke();
+    });
+
+    // Top emotion
+    const sortedEmotions = Object.entries(expressions).sort((a,b) => b[1]-a[1]);
+    const [topEmotion, topConf] = sortedEmotions[0];
+    const info = EMOTIONS_UZ[topEmotion] || { uz: topEmotion, emoji: '😶', color: '#fff' };
+
+    // Update UI (throttled to 5 times per second)
+    if (now - lastUiUpdateTime > 200) {
+      document.getElementById('emotion-emoji').textContent = info.emoji;
+      document.getElementById('emotion-name').textContent = info.uz;
+      document.getElementById('emotion-name').style.color = info.color;
+      document.getElementById('emotion-conf').textContent = `Ishonch: ${(topConf*100).toFixed(1)}%`;
+
+      document.getElementById('age-val').textContent = Math.round(d.age);
+      const genderUz = d.gender === 'male' ? 'Erkak' : 'Ayol';
+      document.getElementById('gender-val').textContent = genderUz;
+
+      let barsHtml = '';
+      sortedEmotions.forEach(([emo, val]) => {
+        const ei = EMOTIONS_UZ[emo] || { uz: emo, emoji: '•', color: '#666' };
+        barsHtml += `
+          <div class="emotion-bar-row">
+            <span class="bar-label">${ei.emoji} ${ei.uz}</span>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${(val*100).toFixed(1)}%;background:${ei.color}"></div>
+            </div>
+            <span class="bar-pct">${(val*100).toFixed(0)}%</span>
+          </div>`;
+      });
+      document.getElementById('emotion-bars').innerHTML = barsHtml;
+
+      // Update session stats
+      emotionStats[topEmotion] = (emotionStats[topEmotion] || 0) + 1;
+      const topStat = Object.entries(emotionStats).sort((a,b)=>b[1]-a[1])[0];
+      if (topStat) {
+        const ti = EMOTIONS_UZ[topStat[0]];
+        document.getElementById('stat-top').textContent = `${ti?.emoji || ''} ${ti?.uz || topStat[0]}`;
+      }
+      
+      lastUiUpdateTime = now;
+    }
+
+    // Label on canvas (always update for smoothness)
+    ctx.fillStyle = 'rgba(5,7,15,0.85)';
+    ctx.fillRect(box.x, box.y - 35, box.width, 32);
+    ctx.fillStyle = info.color;
+    ctx.font = 'bold 14px Space Mono, monospace';
+    ctx.fillText(`${info.emoji} ${info.uz} ${(topConf*100).toFixed(0)}%`, box.x + 8, box.y - 14);
+  }
+
+  requestAnimationFrame(detectLoop);
+}
+
+function takeSnapshot() {
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  
+  // Mirror-mode: video va overlayni birga mirror qilib chizish
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0);
+  ctx.drawImage(overlay, -canvas.width, 0);
+  ctx.restore();
+  
+  const link = document.createElement('a');
+  link.download = `facevision_snapshot_${Date.now()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// Start loading
+loadModels().catch(e => {
+  document.getElementById('loader-text').textContent = 'Xatolik! Internet tekshiring.';
+  console.error(e);
+});
+</script>
+</body>
+</html>
